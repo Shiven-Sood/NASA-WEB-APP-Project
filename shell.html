@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NASA PSI Super Intelligence (SI) Fire Safety Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #080b10; color: #e2e8f0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0; padding: 18px; display: flex; flex-direction: column; gap: 16px;
+        }
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111722; padding: 14px 22px; border-radius: 8px; border: 1px solid #1e293b;
+        }
+        header h1 { margin: 0; font-size: 1.25rem; color: #38bdf8; }
+        .badge { background: #1e293b; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; color: #94a3b8; }
+        .top-grid { display: grid; grid-template-columns: 330px 1fr 370px; gap: 16px; }
+        .mid-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .bottom-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+        .panel {
+            background: #111722; padding: 16px; border-radius: 8px; border: 1px solid #1e293b;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        h2 { margin: 0 0 6px 0; font-size: 1.02rem; color: #f8fafc; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
+        label { font-size: 0.78rem; color: #94a3b8; display: block; margin-bottom: 4px; }
+        select, input[type="text"], input[type="number"], button {
+            width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #334155;
+            background: #0f172a; color: #f8fafc; font-size: 0.84rem;
+        }
+        button {
+            background: #0284c7; border: none; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #0369a1; }
+        .btn-secondary { background: #334155; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-emerald { background: #059669; }
+        .btn-emerald:hover { background: #047857; }
+        .btn-view {
+            padding: 5px 9px; font-size: 0.76rem; background: #1e293b; border: 1px solid #334155;
+            width: auto; border-radius: 5px; color: #e2e8f0;
+        }
+        .btn-view.active, .btn-view:hover { background: #0284c7; border-color: #38bdf8; color: #fff; }
+        #drop-zone {
+            border: 2px dashed #38bdf8; padding: 20px 12px; border-radius: 8px;
+            text-align: center; cursor: pointer; font-size: 0.86rem; color: #e2e8f0; background: #0b1320;
+        }
+        #drop-zone.dragover { border-color: #22c55e; background: #0f172a; }
+        .canvas-wrap { position: relative; display: flex; flex-direction: column; background: #06090e; border-radius: 8px; border: 1px solid #1e293b; overflow: hidden; }
+        .view-toolbar {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;
+            padding: 8px 12px; background: #0f172a; border-bottom: 1px solid #1e293b;
+        }
+        .view-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+        .zoom-controls { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #94a3b8; }
+        .viewport-stack { position: relative; width: 100%; height: 425px; }
+        #canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+        #canvas:active { cursor: grabbing; }
+        #axis-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #hover-tooltip {
+            position: absolute; display: none; pointer-events: none; z-index: 10;
+            background: rgba(15, 23, 42, 0.95); border: 1px solid #38bdf8; border-radius: 6px;
+            padding: 8px 10px; font-size: 0.78rem; color: #f8fafc; box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+            line-height: 1.4; white-space: nowrap;
+        }
+        .legend {
+            display: flex; justify-content: space-between; padding: 8px 14px; background: #0f172a;
+            font-size: 0.76rem; color: #cbd5e1; border-top: 1px solid #1e293b;
+        }
+        .dot-orange { color: #ff5919; font-weight: bold; }
+        .dot-cyan { color: #26ccff; font-weight: bold; }
+        .insight-box {
+            background: #0b1018; padding: 12px; border-radius: 6px; border: 1px solid #1e293b;
+            font-size: 0.84rem; line-height: 1.5; color: #cbd5e1; max-height: 250px; overflow-y: auto;
+        }
+        .calc-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .calc-result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 4px; }
+        .metric-card {
+            background: #0b1018; border: 1px solid #1e293b; border-radius: 6px; padding: 10px; text-align: center;
+        }
+        .metric-val { font-size: 1.15rem; font-weight: 700; color: #38bdf8; margin-top: 3px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { border: 1px solid #1e293b; padding: 7px 9px; text-align: left; }
+        th { background: #0f172a; color: #38bdf8; }
+        .earth-card { background: #0b1018; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #38bdf8; font-size: 0.82rem; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>🚀 NASA PSI Super Intelligence (SI) Combustion &amp; Fire Safety Dashboard</h1>
+            <small style="color:#94a3b8;">Physical Sciences Informatics (PSI) | C++17 WebAssembly + WebGL2 Spatial Engine | By Shiven Sood</small>
+        </div>
+        <div class="badge">DSA Engine: Hilbert-Radix | Timsort | MergeSort | 3D KD-Tree | R-Tree | Geohash</div>
+    </header>
+
+    <div class="top-grid">
+        <div class="panel">
+            <h2>1. User Telemetry Input &amp; Filters</h2>
+
+            <div id="drop-zone">📂 <strong>Drag &amp; Drop NASA .CSV or .XLSX File Here</strong><br><small style="color:#94a3b8;">or click to browse from your computer</small></div>
+            <input type="file" id="file-input" style="display: none;" accept=".csv,.xlsx,.xls,.txt">
+
+            <div>
+                <label>Mission Environment (Gravity &amp; Atmosphere):</label>
+                <select id="env-filter" onchange="applyMissionFilter()">
+                    <option value="ALL">All Environments (ISS 0g, Lunar 1/6g, Mars 3/8g)</option>
+                    <option value="ISS">ISS Spacecraft (0g Microgravity, &lt;30% O2)</option>
+                    <option value="LUNAR">Lunar Base Habitat (1/6g Partial-g, &ge;30% O2)</option>
+                    <option value="MARS">Martian Surface Habitat (3/8g, Low Pressure)</option>
+                    <option value="ROVER">Pressurized Crew Rover (Exploration Transfer)</option>
+                </select>
+            </div>
+            <div>
+                <label>Fire Safety Pillar:</label>
+                <select id="pillar-filter" onchange="applyMissionFilter()">
+                    <option value="ALL">All Safety Pillars (Prevention, Detection, Suppression)</option>
+                    <option value="PREVENTION">1. Prevention (Material Flammability / Lim O2 Index)</option>
+                    <option value="DETECTION">2. Detection (Soot/Smoke Particle Sizing &amp; Gas Sensors)</option>
+                    <option value="SUPPRESSION">3. Suppression (CO2, Helium, Fine Water Mist Efficacy)</option>
+                </select>
+            </div>
+            <div>
+                <label>Filter by NASA PSI Investigation:</label>
+                <select id="study-select" onchange="loadPresetStudy()">
+                    <option value="ALL">All Uploaded Investigations</option>
+                    <option value="SAFFIRE">Saffire I-VI (Spacecraft Fire Growth)</option>
+                    <option value="BASS">BASS-II (Burning &amp; Suppression of Solids)</option>
+                    <option value="FLEX">FLEX / CFI-G (Cool Flames &amp; Droplets)</option>
+                    <option value="ACME">ACME / BRE (Gaseous Burner Experiments)</option>
+                    <option value="SPICE">SPICE / SLICE (Smoke Point &amp; Laminar Soot)</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:8px;">
+                <button onclick="exportFilteredData('csv')" class="btn-secondary">⬇ Export Clean CSV</button>
+                <button onclick="exportFilteredData('json')" class="btn-secondary">⬇ Export JSON</button>
+            </div>
+        </div>
+
+        <!-- CENTER PANEL: 3D/2D View Switcher + Zoom + Interactive WebGL2 Viewport -->
+        <div class="canvas-wrap">
+            <div class="view-toolbar">
+                <div class="view-btns">
+                    <button class="btn-view active" id="btn-3d" onclick="setViewMode('3D')">🧊 3D Cube</button>
+                    <button class="btn-view" id="btn-xy" onclick="setViewMode('XY')">📐 2D: O₂ vs Pressure (XY)</button>
+                    <button class="btn-view" id="btn-xz" onclick="setViewMode('XZ')">📐 2D: O₂ vs Spread (XZ)</button>
+                    <button class="btn-view" id="btn-yz" onclick="setViewMode('YZ')">📐 2D: Pressure vs Spread (YZ)</button>
+                </div>
+                <div class="zoom-controls">
+                    <button class="btn-view" onclick="adjustZoom(-0.15)" title="Zoom Out">➖</button>
+                    <input type="range" id="zoom-slider" min="0.40" max="2.50" step="0.05" value="0.78" style="width:85px;" oninput="setZoomFromSlider(this.value)">
+                    <button class="btn-view" onclick="adjustZoom(0.15)" title="Zoom In">➕</button>
+                    <span id="zoom-label" style="min-width:38px; color:#38bdf8; font-weight:bold;">100%</span>
+                </div>
+            </div>
+
+            <div class="viewport-stack">
+                <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+                <canvas id="axis-overlay"></canvas>
+                <div id="hover-tooltip"></div>
+            </div>
+
+            <div class="legend">
+                <span><span class="dot-cyan">● Cyan:</span> Nominal (&lt;30% O2)</span>
+                <span><span class="dot-orange">● Orange:</span> Hazard (&ge;30% O2)</span>
+                <span><strong style="color:#ff5959;">X:</strong> O2% | <strong style="color:#4ade80;">Y:</strong> Pressure | <strong style="color:#60a5fa;">Z:</strong> Spread</span>
+                <span>🖱️ Scroll to Zoom • Hover dot for exact values</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>2. SI Insights &amp; C++ Benchmarks</h2>
+            <div class="insight-box" id="ai-output">
+                <em>Waiting for user to drag &amp; drop a NASA telemetry file (.CSV or .XLSX) on the left panel, or simulate a future experiment below...</em>
+            </div>
+
+            <h2>3. SI Interactive Query &amp; KD-Tree Lookup</h2>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                <div>
+                    <label>Target O2 (%):</label>
+                    <input type="number" id="kd-o2" value="34.0" step="0.5">
+                </div>
+                <div>
+                    <label>Target Pressure (kPa):</label>
+                    <input type="number" id="kd-pr" value="70.3" step="1.0">
+                </div>
+            </div>
+            <button onclick="runKDTreeQuery()">🔍 Run C++ 3D KD-Tree Nearest-Neighbor Search</button>
+            <div style="display:flex; gap:6px; margin-top:4px;">
+                <input type="text" id="si-question" placeholder="Ask SI (e.g. 'Why do cool flames reignite?' or 'Lunar base risk')">
+                <button onclick="askSIQuestion()" style="width:90px;">Ask SI</button>
+            </div>
+            <div class="insight-box" id="qa-output" style="max-height:110px;">
+                <em>Upload a file first, then run a 3D KD-Tree spatial lookup or ask an SI question above.</em>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW MODULE: FUTURE EXPERIMENT PREDICTIVE CALCULATOR & SIMULATOR -->
+    <div class="panel">
+        <h2>4. 🧮 Future Space Experiment Predictive Calculator &amp; What-If Simulator (BASS-II / Saffire Physics Model)</h2>
+        <div class="calc-grid">
+            <div>
+                <label>Oxygen Concentration (%):</label>
+                <input type="number" id="sim-o2" value="34.0" min="10" max="90" step="0.5" oninput="calculateFutureExperiment()">
+            </div>
+            <div>
+                <label>Ambient Pressure (kPa):</label>
+                <input type="number" id="sim-pr" value="70.3" min="20" max="150" step="1.0" oninput="calculateFutureExperiment()">
+            </div>
+            <div>
+                <label>Ventilation Flow (cm/s):</label>
+                <input type="number" id="sim-flow" value="20.0" min="0" max="100" step="1.0" oninput="calculateFutureExperiment()">
+            </div>
+            <div>
+                <label>Gravity Regime (g):</label>
+                <select id="sim-grav" onchange="calculateFutureExperiment()">
+                    <option value="0.0">0.00g (ISS Microgravity)</option>
+                    <option value="0.16" selected>0.16g (Lunar Base 1/6g)</option>
+                    <option value="0.38">0.38g (Martian Surface 3/8g)</option>
+                    <option value="1.0">1.00g (Earth Baseline)</option>
+                </select>
+            </div>
+            <div>
+                <label>Spacecraft Material / Fuel:</label>
+                <select id="sim-fuel" onchange="calculateFutureExperiment()">
+                    <option value="1.0">PMMA Acrylic Sheet (Saffire/BASS)</option>
+                    <option value="1.35">Sibal Cotton-Fiberglass Cloth</option>
+                    <option value="0.65">Nomex Flame-Retardant Fabric</option>
+                    <option value="1.55">n-Heptane Liquid Droplet (FLEX)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="calc-result-grid">
+            <div class="metric-card">
+                <div style="font-size:0.75rem; color:#94a3b8;">Predicted Flame Spread Rate</div>
+                <div class="metric-val" id="res-spread">1.412 mm/s</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:0.75rem; color:#94a3b8;">Limiting O2 Index (LOI Threshold)</div>
+                <div class="metric-val" id="res-loi">17.8 % O₂</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:0.75rem; color:#94a3b8;">Habitat Flammability Risk Score</div>
+                <div class="metric-val" id="res-risk" style="color:#ff5919;">78 / 100 (HIGH)</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:0.75rem; color:#94a3b8;">Required Suppressant &amp; Action</div>
+                <div class="metric-val" id="res-supp" style="font-size:0.9rem; color:#4ade80;">He/CO₂ Dilution (&gt;32%)</div>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:4px;">
+            <button onclick="calculateFutureExperiment()" style="flex:1;">🧮 Recalculate Physics Model</button>
+            <button onclick="injectSimulatedPointTo3D()" class="btn-emerald" style="flex:1;">➕ Inject &amp; Plot Simulated Experiment in 3D Cube</button>
+        </div>
+    </div>
+
+    <div class="bottom-grid">
+        <div class="panel">
+            <h2>5. Cross-Experiment Comparison Matrix (12 Featured NASA PSI Studies)</h2>
+            <div style="overflow-x:auto;">
+                <table id="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Investigation</th>
+                            <th>ISS Facility</th>
+                            <th>Fuel Type</th>
+                            <th>O2 / Pressure Regime</th>
+                            <th>Safety Pillar</th>
+                            <th>Key Microgravity Finding</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Saffire I-VI</strong></td><td>Cygnus Vehicle</td><td>Solid (PMMA / Sibal Cloth)</td><td>21%–40% O2 / 55–101 kPa</td><td>Prevention / Suppression</td><td>Opposed-flow flame spread accelerates in low-pressure, high-O2 Lunar exploration atmospheres.</td></tr>
+                        <tr><td><strong>BASS-II</strong></td><td>MSG (Glovebox)</td><td>Solid (Acrylic Rods / Fabrics)</td><td>15%–30% O2 / 101.3 kPa</td><td>Prevention / Suppression</td><td>Slow ventilation airflow (&lt;5 cm/s) intensifies microgravity combustion faster than 1g buoyancy.</td></tr>
+                        <tr><td><strong>FLEX / CFI-G</strong></td><td>CIR (Chamber)</td><td>Liquid (Heptane / Methanol)</td><td>21% O2 / 101.3 kPa</td><td>Suppression</td><td>Discovered two-stage "Cool Flames" (500–800 K) that continue burning invisibly and cause vapor reignition.</td></tr>
+                        <tr><td><strong>ACME / BRE</strong></td><td>CIR (MDCA)</td><td>Gaseous (Methane / Ethylene)</td><td>17%–35% O2 / 70–101 kPa</td><td>Prevention</td><td>Long-duration hemispherical burner tests define material flammability limits for spacecraft walls.</td></tr>
+                        <tr><td><strong>SPICE / SLICE</strong></td><td>MSG</td><td>Gaseous Co-flow Flames</td><td>21% O2 / 101.3 kPa</td><td>Detection</td><td>Microgravity soot aggregates grow larger than in 1g, requiring recalibrated photoelectric smoke detectors.</td></tr>
+                        <tr><td><strong>SAME / DAFT</strong></td><td>MSG / CIR</td><td>Solid &amp; Laminar Diffusion</td><td>21% O2 / 101.3 kPa</td><td>Detection</td><td>Characterized smoke particle size distribution for early spacecraft fire detection algorithms.</td></tr>
+                        <tr><td><strong>E-FIELD / LUCI / FM2</strong></td><td>CIR</td><td>Droplets &amp; Solid Cylinders</td><td>21%–34% O2 / 70–101 kPa</td><td>Suppression</td><td>Electric-field flame manipulation offers gas-free fire suppression in sealed habitats.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>6. Earth Applications Spotlight (Space-to-Ground Spin-Offs)</h2>
+            <div class="earth-card">
+                <strong>🚒 Next-Gen Fine-Water-Mist &amp; Clean Extinguishers (FLEX &amp; BASS-II):</strong><br>
+                Droplet combustion physics in 0g directly improved ultra-fine water-mist suppression systems used in Earth server rooms, submarines, and aircraft cabins without toxic Halon gases.
+            </div>
+            <div class="earth-card">
+                <strong>🚨 False-Alarm-Proof Smoke Detectors (SAME &amp; SPICE):</strong><br>
+                Mapping soot fractal aggregation in microgravity enabled multi-wavelength optical sensors on Earth that distinguish real toxic smoke from cooking steam or dust.
+            </div>
+            <div class="earth-card">
+                <strong>⚡ Low-Emission Engines &amp; Cool-Flame Chemistry (CFI-G &amp; ACME):</strong><br>
+                NASA's discovery of low-temperature "cool flame" chemistry in heptane droplets is now embedded in terrestrial HCCI automotive engine simulations to boost fuel efficiency and cut soot emissions.
+            </div>
+        </div>
+    </div>
+
+    {{{ SCRIPT }}}
+
+    <script>
+        let currentCSVText = "";
+        window.loaded3DPoints = [];
+        let hoveredPoint = null;
+
+        let axisRanges = {
+            minO2: 15.0, maxO2: 75.0,
+            minPr: 45.0, maxPr: 105.0,
+            minSp: 0.10, maxSp: 2.00
+        };
+
+        window.updateAxisRanges = function(minO2, maxO2, minPr, maxPr, minSp, maxSp) {
+            axisRanges = { minO2, maxO2, minPr, maxPr, minSp, maxSp };
+            draw3DAxisOverlay();
+        };
+
+        const canvasEl = document.getElementById('canvas');
+        const overlayEl = document.getElementById('axis-overlay');
+        const tooltipEl = document.getElementById('hover-tooltip');
+        const ctx2d = overlayEl.getContext('2d');
+
+        let isDragging = false, lastX = 0, lastY = 0;
+        let rotX = 0.35, rotY = -0.55, zoomLevel = 0.78;
+        let currentViewMode = '3D';
+
+        // Future Space Experiment Predictive Calculator (Physics-informed Saffire/BASS-II empirical correlation)
+        function calculateFutureExperiment() {
+            const o2 = parseFloat(document.getElementById('sim-o2').value) || 21.0;
+            const pr = parseFloat(document.getElementById('sim-pr').value) || 101.3;
+            const flow = parseFloat(document.getElementById('sim-flow').value) || 5.0;
+            const grav = parseFloat(document.getElementById('sim-grav').value) || 0.0;
+            const fuelFactor = parseFloat(document.getElementById('sim-fuel').value) || 1.0;
+
+            // Limiting Oxygen Index (LOI) decreases slightly as pressure and ventilation rise
+            const loi = Math.max(12.5, (18.5 / Math.pow(pr / 101.3, 0.15)) - (flow * 0.03));
+
+            let spread = 0.0;
+            if (o2 > loi) {
+                const o2Factor = Math.pow((o2 - loi) / (21.0 - 14.0), 1.35);
+                const prFactor = Math.pow(pr / 101.3, 0.25);
+                const flowFactor = 0.45 + 0.55 * Math.pow(Math.max(0.5, flow) / 10.0, 0.35);
+                const gravPenalty = (grav > 0.0 && grav < 0.4) ? 1.18 : 1.0; // Partial-g ventilation synergy
+                spread = Math.min(4.95, Math.max(0.05, 0.38 * o2Factor * prFactor * flowFactor * gravPenalty * fuelFactor));
+            }
+
+            const riskScore = Math.min(100, Math.max(0, Math.round(((o2 - 15.0) * 1.6) + (spread * 22.0) + (pr < 75 ? 10 : 0))));
+
+            document.getElementById('res-spread').innerText = spread > 0 ? `${spread.toFixed(3)} mm/s` : `0.000 (Self-Extinguished)`;
+            document.getElementById('res-loi').innerText = `${loi.toFixed(1)} % O₂`;
+
+            const riskEl = document.getElementById('res-risk');
+            if (riskScore >= 65 || o2 >= 30.0) {
+                riskEl.style.color = '#ff5919';
+                riskEl.innerText = `${riskScore} / 100 (CRITICAL)`;
+            } else if (riskScore >= 35) {
+                riskEl.style.color = '#facc15';
+                riskEl.innerText = `${riskScore} / 100 (MODERATE)`;
+            } else {
+                riskEl.style.color = '#4ade80';
+                riskEl.innerText = `${riskScore} / 100 (NOMINAL)`;
+            }
+
+            const suppEl = document.getElementById('res-supp');
+            if (fuelFactor > 1.4) {
+                suppEl.innerText = `Fine Water Mist + Vapor Purge (Cool Flame Risk)`;
+            } else if (o2 >= 30.0) {
+                suppEl.innerText = `Cut Ventilation + He/CO₂ Inerting (>35% vol)`;
+            } else {
+                suppEl.innerText = `Standard ISS CO₂ Portable Extinguisher`;
+            }
+
+            return { o2, pr, spread: Math.max(0.05, spread) };
+        }
+
+        // Injects the user's simulated future experiment directly into the C++ WebAssembly 3D Cube!
+        function injectSimulatedPointTo3D() {
+            const sim = calculateFutureExperiment();
+            if (!currentCSVText || currentCSVText.trim() === "") {
+                currentCSVText = "oxygen,pressure,spread,study,pillar,env\n";
+            }
+            const envTag = sim.o2 >= 30 ? "LUNAR" : "ISS";
+            const newRow = `${sim.o2.toFixed(2)},${sim.pr.toFixed(2)},${sim.spread.toFixed(3)},FUTURE-SIM,PREVENTION,${envTag}`;
+            currentCSVText = currentCSVText.trim() + "\n" + newRow;
+            Module.ccall('process_uploaded_csv', 'void', ['string'], [currentCSVText]);
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            document.querySelectorAll('.view-btns .btn-view').forEach(b => b.classList.remove('active'));
+            if (mode === '3D') {
+                rotX = 0.35; rotY = -0.55;
+                document.getElementById('btn-3d').classList.add('active');
+            } else if (mode === 'XY') {
+                rotX = 0.0; rotY = 0.0;
+                document.getElementById('btn-xy').classList.add('active');
+            } else if (mode === 'XZ') {
+                rotX = 1.570796; rotY = 0.0;
+                document.getElementById('btn-xz').classList.add('active');
+            } else if (mode === 'YZ') {
+                rotX = 0.0; rotY = -1.570796;
+                document.getElementById('btn-yz').classList.add('active');
+            }
+            if (Module._set_camera_rotation) Module._set_camera_rotation(rotX, rotY);
+            draw3DAxisOverlay();
+        }
+
+        function updateZoom(newZoom) {
+            zoomLevel = Math.max(0.40, Math.min(2.50, parseFloat(newZoom)));
+            document.getElementById('zoom-slider').value = zoomLevel.toFixed(2);
+            document.getElementById('zoom-label').innerText = Math.round((zoomLevel / 0.78) * 100) + '%';
+            if (Module._set_camera_zoom) Module._set_camera_zoom(zoomLevel);
+            draw3DAxisOverlay();
+        }
+
+        function adjustZoom(delta) { updateZoom(zoomLevel + delta); }
+        function setZoomFromSlider(val) { updateZoom(parseFloat(val)); }
+
+        canvasEl.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 0.08 : -0.08;
+            updateZoom(zoomLevel + delta);
+        }, { passive: false });
+
+        function project3DTo2D(x, y, z, width, height) {
+            const px = (x / 512.0) - 1.0;
+            const py = (y / 512.0) - 1.0;
+            const pz = (z / 512.0) - 1.0;
+
+            const cy = Math.cos(rotY), sy = Math.sin(rotY);
+            const ry_x = px * cy + pz * sy;
+            const ry_y = py;
+            const ry_z = -px * sy + pz * cy;
+
+            const cx = Math.cos(rotX), sx = Math.sin(rotX);
+            const rx_x = ry_x;
+            const rx_y = ry_y * cx - ry_z * sx;
+
+            const ndcX = rx_x * zoomLevel;
+            const ndcY = rx_y * zoomLevel;
+
+            return {
+                x: (ndcX + 1.0) * 0.5 * width,
+                y: (1.0 - (ndcY + 1.0) * 0.5) * height
+            };
+        }
+
+        function draw3DAxisOverlay() {
+            const rect = canvasEl.getBoundingClientRect();
+            overlayEl.width = rect.width;
+            overlayEl.height = rect.height;
+            ctx2d.clearRect(0, 0, overlayEl.width, overlayEl.height);
+
+            const L = 160, H = 864;
+            ctx2d.font = "600 11px 'Segoe UI', sans-serif";
+
+            for (let i = 0; i <= 4; i++) {
+                const frac = i * 0.25;
+                const pos = L + (H - L) * frac;
+
+                if (currentViewMode !== 'YZ') {
+                    const ptX = project3DTo2D(pos, L - 28, L - 28, overlayEl.width, overlayEl.height);
+                    const valO2 = (axisRanges.minO2 + (axisRanges.maxO2 - axisRanges.minO2) * frac).toFixed(1);
+                    ctx2d.fillStyle = "#ff7b7b";
+                    ctx2d.fillText(`${valO2}%`, ptX.x - 14, ptX.y + 4);
+                }
+
+                if (i > 0 && currentViewMode !== 'XZ') {
+                    const ptY = project3DTo2D(L - 45, pos, L, overlayEl.width, overlayEl.height);
+                    const valPr = (axisRanges.minPr + (axisRanges.maxPr - axisRanges.minPr) * frac).toFixed(0);
+                    ctx2d.fillStyle = "#4ade80";
+                    ctx2d.fillText(`${valPr} kPa`, ptY.x - 22, ptY.y + 4);
+                }
+
+                if (i > 0 && currentViewMode !== 'XY') {
+                    const ptZ = project3DTo2D(L - 30, L - 25, pos, overlayEl.width, overlayEl.height);
+                    const valSp = (axisRanges.minSp + (axisRanges.maxSp - axisRanges.minSp) * frac).toFixed(2);
+                    ctx2d.fillStyle = "#60a5fa";
+                    ctx2d.fillText(`${valSp}`, ptZ.x - 12, ptZ.y + 4);
+                }
+            }
+
+            ctx2d.font = "bold 12px 'Segoe UI', sans-serif";
+            if (currentViewMode !== 'YZ') {
+                const tipX = project3DTo2D(H + 55, L, L, overlayEl.width, overlayEl.height);
+                ctx2d.fillStyle = "#ff5959";
+                ctx2d.fillText("X: O2 (%)", tipX.x - 25, tipX.y);
+            }
+            if (currentViewMode !== 'XZ') {
+                const tipY = project3DTo2D(L, H + 45, L, overlayEl.width, overlayEl.height);
+                ctx2d.fillStyle = "#4ade80";
+                ctx2d.fillText("Y: Pressure (kPa)", tipY.x - 45, tipY.y);
+            }
+            if (currentViewMode !== 'XY') {
+                const tipZ = project3DTo2D(L, L, H + 55, overlayEl.width, overlayEl.height);
+                ctx2d.fillStyle = "#60a5fa";
+                ctx2d.fillText("Z: Spread (mm/s)", tipZ.x - 45, tipZ.y);
+            }
+
+            if (hoveredPoint) {
+                ctx2d.beginPath();
+                ctx2d.arc(hoveredPoint.screenX, hoveredPoint.screenY, 8, 0, Math.PI * 2);
+                ctx2d.strokeStyle = "#facc15";
+                ctx2d.lineWidth = 2.0;
+                ctx2d.stroke();
+            }
+        }
+
+        window.addEventListener('resize', draw3DAxisOverlay);
+        setTimeout(() => { draw3DAxisOverlay(); calculateFutureExperiment(); }, 200);
+
+        canvasEl.addEventListener('mousedown', (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvasEl.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (isDragging) {
+                currentViewMode = '3D';
+                document.querySelectorAll('.view-btns .btn-view').forEach(b => b.classList.remove('active'));
+                document.getElementById('btn-3d').classList.add('active');
+
+                rotY += (e.clientX - lastX) * 0.01;
+                rotX += (e.clientY - lastY) * 0.01;
+                lastX = e.clientX; lastY = e.clientY;
+                if (Module._set_camera_rotation) Module._set_camera_rotation(rotX, rotY);
+                tooltipEl.style.display = 'none';
+                hoveredPoint = null;
+                draw3DAxisOverlay();
+                return;
+            }
+
+            if (mouseX >= 0 && mouseX <= rect.width && mouseY >= 0 && mouseY <= rect.height && window.loaded3DPoints.length > 0) {
+                let closest = null;
+                let minDist = 14;
+                for (const pt of window.loaded3DPoints) {
+                    const proj = project3DTo2D(pt.x, pt.y, pt.z, rect.width, rect.height);
+                    const dist = Math.hypot(proj.x - mouseX, proj.y - mouseY);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = { ...pt, screenX: proj.x, screenY: proj.y };
+                    }
+                }
+
+                if (closest) {
+                    hoveredPoint = closest;
+                    const isHaz = closest.o2 >= 30.0;
+                    tooltipEl.style.display = 'block';
+                    tooltipEl.style.left = Math.min(rect.width - 185, closest.screenX + 12) + 'px';
+                    tooltipEl.style.top = Math.max(10, closest.screenY - 35) + 'px';
+                    tooltipEl.innerHTML =
+                        `<strong style="color:${isHaz ? '#ff5919' : '#38bdf8'};">${isHaz ? '⚠️ Lunar Hazard Point' : '✅ Nominal ISS Point'}</strong><br>` +
+                        `• <strong>O2 Conc (X):</strong> ${closest.o2.toFixed(2)} %<br>` +
+                        `• <strong>Pressure (Y):</strong> ${closest.pr.toFixed(2)} kPa<br>` +
+                        `• <strong>Spread Rate (Z):</strong> ${closest.sp.toFixed(3)} mm/s<br>` +
+                        `• <strong>Morton Code:</strong> <code>0x${closest.morton.toString(16).toUpperCase()}</code>`;
+                    draw3DAxisOverlay();
+                } else if (hoveredPoint) {
+                    hoveredPoint = null;
+                    tooltipEl.style.display = 'none';
+                    draw3DAxisOverlay();
+                }
+            } else if (hoveredPoint) {
+                hoveredPoint = null;
+                tooltipEl.style.display = 'none';
+                draw3DAxisOverlay();
+            }
+        });
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        const handleFile = (file) => {
+            if (!file) return;
+            dropZone.innerHTML = `✅ <strong>Loaded: ${file.name}</strong><br><small style="color:#38bdf8;">Drop another .CSV or .XLSX file to replace</small>`;
+            document.getElementById('ai-output').innerHTML = "<em>Processing uploaded file in C++ WebAssembly...</em>";
+
+            const lowerName = file.name.toLowerCase();
+            const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+            const reader = new FileReader();
+
+            if (isExcel && typeof XLSX !== 'undefined') {
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    currentCSVText = XLSX.utils.sheet_to_csv(firstSheet);
+                    Module.ccall('process_uploaded_csv', 'void', ['string'], [currentCSVText]);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = (e) => {
+                    currentCSVText = e.target.result;
+                    Module.ccall('process_uploaded_csv', 'void', ['string'], [currentCSVText]);
+                };
+                reader.readAsText(file);
+            }
+        };
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        function applyMissionFilter() {
+            if (!currentCSVText) {
+                alert("Please drag & drop a CSV or XLSX file first!");
+                return;
+            }
+            const env = document.getElementById('env-filter').value;
+            const pillar = document.getElementById('pillar-filter').value;
+            const lines = currentCSVText.trim().split('\n');
+            let filtered = [lines[0]];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const o2 = parseFloat(cols[0]);
+                const rowPillar = (cols[4] || 'ALL').toUpperCase();
+                const rowEnv = (cols[5] || (o2 >= 30 ? 'LUNAR' : 'ISS')).toUpperCase();
+                const envMatch = (env === 'ALL') || (rowEnv.includes(env)) || (env === 'LUNAR' && o2 >= 30) || (env === 'ISS' && o2 < 30);
+                const pillarMatch = (pillar === 'ALL') || (rowPillar.includes(pillar));
+                if (envMatch && pillarMatch) filtered.push(lines[i]);
+            }
+            if (filtered.length <= 1) filtered = lines;
+            Module.ccall('process_uploaded_csv', 'void', ['string'], [filtered.join('\n')]);
+        }
+
+        function loadPresetStudy() {
+            if (!currentCSVText) {
+                alert("Please drag & drop a CSV or XLSX file first!");
+                return;
+            }
+            const study = document.getElementById('study-select').value;
+            const lines = currentCSVText.trim().split('\n');
+            if (study === 'ALL') {
+                Module.ccall('process_uploaded_csv', 'void', ['string'], [currentCSVText]);
+                return;
+            }
+            let filtered = [lines[0]];
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].toUpperCase().includes(study)) filtered.push(lines[i]);
+            }
+            if (filtered.length <= 1) filtered = lines;
+            Module.ccall('process_uploaded_csv', 'void', ['string'], [filtered.join('\n')]);
+        }
+
+        window.generateSIReport = function(recordCount, avgO2, maxSpread, hazardCount, radixMs, timMs, mergeMs) {
+            const output = document.getElementById('ai-output');
+            let html = `<strong>Processed Telemetry:</strong> ${recordCount} user records indexed in 3D Hilbert Space.<br>`;
+            html += `<strong>Avg O2:</strong> ${avgO2.toFixed(2)}% | <strong>Max Spread:</strong> ${maxSpread.toFixed(2)} mm/s | <strong>Hazard Points (&ge;30% O2):</strong> ${hazardCount}<br><hr style="border-color:#1e293b">`;
+
+            if (avgO2 >= 30.0 || hazardCount > 0) {
+                html += `<strong style="color:#ff5919;">⚠️ Lunar Base Exploration Alert (&ge;30% O2, &le;10.2 psi):</strong> ${hazardCount} regime(s) exceed the 30% O2 flammability threshold. In low-gravity ventilation flows, upward/opposed flame spread accelerates rapidly.<br>`;
+            } else {
+                html += `<strong style="color:#38bdf8;">✅ Nominal ISS Regime (&lt;30% O2):</strong> Spherical diffusion flames remain diffusion-limited without buoyant convection.<br>`;
+            }
+
+            html += `<hr style="border-color:#1e293b"><strong>⚡ Live C++ WebAssembly Algorithm Benchmarks:</strong><br>`;
+            html += `• <strong>Radix-Hilbert Sort (Base-256):</strong> ${radixMs.toFixed(4)} ms<br>`;
+            html += `• <strong>Timsort (Hybrid Run=32):</strong> ${timMs.toFixed(4)} ms<br>`;
+            html += `• <strong>Merge Sort (Divide &amp; Conquer):</strong> ${mergeMs.toFixed(4)} ms<br>`;
+            html += `• <strong>Spatial Trees Built:</strong> 3D KD-Tree (${recordCount} nodes) + R-Tree + 64-Bucket Geohash Table.`;
+            output.innerHTML = html;
+        };
+
+        function runKDTreeQuery() {
+            if (!currentCSVText) {
+                alert("Please upload a file or click 'Inject & Plot Simulated Experiment' first!");
+                return;
+            }
+            const o2 = parseFloat(document.getElementById('kd-o2').value) || 34.0;
+            const pr = parseFloat(document.getElementById('kd-pr').value) || 70.3;
+            Module.ccall('query_kdtree_nearest', 'void', ['number', 'number'], [o2, pr]);
+        }
+
+        window.onKDTreeResult = function(o2, pr, spread, morton) {
+            document.getElementById('qa-output').innerHTML =
+                `<strong>🎯 3D KD-Tree Nearest Telemetry Match:</strong><br>` +
+                `O2: <strong>${o2.toFixed(1)}%</strong> | Pressure: <strong>${pr.toFixed(1)} kPa</strong> | Flame Spread: <strong>${spread.toFixed(2)} mm/s</strong><br>` +
+                `Hilbert/Morton Index: <code>0x${morton.toString(16).toUpperCase()}</code> — ` +
+                (o2 >= 30 ? `<span style="color:#ff5919;">Requires Saffire/BASS-II fire-resistant barrier &amp; Helium/CO2 suppression.</span>`
+                          : `<span style="color:#38bdf8;">Within nominal ISS 21% O2 cabin operating envelope.</span>`);
+        };
+
+        function askSIQuestion() {
+            const q = document.getElementById('si-question').value.toLowerCase();
+            const box = document.getElementById('qa-output');
+            if (q.includes('cool') || q.includes('flex') || q.includes('reignit')) {
+                box.innerHTML = `<strong>SI Answer (FLEX / CFI-G):</strong> In microgravity, heptane/alkane droplets radiative-quench from hot flames (~2000 K) into invisible <em>Cool Flames</em> (500–800 K). Without forced vapor dispersion, partial-oxidation products accumulate and can spontaneously reignite.`;
+            } else if (q.includes('lunar') || q.includes('30%') || q.includes('saffire') || q.includes('mars')) {
+                box.innerHTML = `<strong>SI Answer (Saffire / Lunar Base):</strong> NASA exploration habitats operate at reduced pressure (~55–70 kPa / 8–10.2 psi) and elevated oxygen (&ge;30–34% O2) to eliminate pre-breathe time before EVAs. This lowers ignition energy and speeds up flame spread, requiring strict material screening.`;
+            } else if (q.includes('detect') || q.includes('smoke') || q.includes('soot') || q.includes('same') || q.includes('spice')) {
+                box.innerHTML = `<strong>SI Answer (SAME / SPICE):</strong> Without buoyant plume rise in 0g, soot particles stay in the flame zone longer and form larger fractal aggregates. Spacecraft detectors must follow ventilation return ducts and calibrate for larger particle diameters.`;
+            } else {
+                box.innerHTML = `<strong>SI Synthesis:</strong> Across NASA's 12 PSI combustion studies (CIR, MDCA, MSG), ventilation velocity and O2 mole fraction are the primary drivers of microgravity flame spread. Use fine-water-mist or CO2/He inerting directed counter-current to ventilation flow.`;
+            }
+        }
+
+        function exportFilteredData(format) {
+            if (!currentCSVText) {
+                alert("Please upload a CSV or XLSX file first before exporting!");
+                return;
+            }
+            const lines = currentCSVText.trim().split('\n');
+            let content = '', mime = 'text/csv', ext = 'csv';
+            if (format === 'json') {
+                const headers = lines[0].split(',');
+                const arr = lines.slice(1).map(line => {
+                    const vals = line.split(',');
+                    let obj = {};
+                    headers.forEach((h, i) => obj[h.trim() || `col_${i}`] = isNaN(vals[i]) ? vals[i] : parseFloat(vals[i]));
+                    return obj;
+                });
+                content = JSON.stringify(arr, null, 2);
+                mime = 'application/json'; ext = 'json';
+            } else {
+                content = currentCSVText;
+            }
+            const blob = new Blob([content], { type: mime });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `nasa_psi_exported_dataset.${ext}`;
+            a.click();
+        }
+    </script>
+</body>
+</html>
