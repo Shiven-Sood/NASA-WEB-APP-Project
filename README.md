@@ -1,7 +1,8 @@
 FLAME IN FREEFALL: NASA PSI SUPER INTELLIGENCE (SI) FIRE SAFETY DASHBOARD
 
 Developer: Shiven Sood
-Email: shivensoid@gmail.com
+Work Email ID : shivensoid@gmail.com , ShivenSood.25509@stu.upes.ac.in
+Registered Email ID : soodshiven02@gmail.com
 GitHub Repository: https://github.com/Shiven-Sood/NASA-WEB-APP-Project
 
 
